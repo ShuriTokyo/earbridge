@@ -51,9 +51,9 @@ npx expo run:ios --device --configuration Release
 
 **Two things that break the build.** Keep the project in a folder whose path has no spaces (not under
 `~/Library/Application Support`, say): Expo's build scripts split such paths and fail with "No such file or
-directory". And if the last step, *Bundle React Native code and images*, fails with `EPERM` writing `main.jsbundle`,
-turn off Xcode's script sandbox for the app: in `mobile/ios/Alo.xcodeproj`, the **Alo** target → **Build Settings**
-→ **User Script Sandboxing** → **No** (`prebuild --clean` turns it back on).
+directory". Xcode's script sandbox, which makes the last step (*Bundle React Native code and images*) fail with `EPERM`
+writing `main.jsbundle`, is turned off by `mobile/plugins/without-script-sandboxing.js` every time `expo prebuild`
+makes the project.
 
 **Signing.** The first time, Xcode has to know which team signs the app:
 
@@ -66,7 +66,8 @@ turn off Xcode's script sandbox for the app: in `mobile/ios/Alo.xcodeproj`, the 
 4. Run `npx expo run:ios --device --configuration Release` again.
 
 To keep the team across prebuilds, add it to `mobile/app.json` instead: `"ios": { "appleTeamId": "ABCDE12345" }`.
-A team id is not a secret, but keep it out of the repository anyway unless the repository is yours alone.
+A team id is not a secret, but keep it out of the repository anyway unless the repository is yours alone. This fork
+builds as `com.sri.alo` with its own team in `mobile/app.json`: change both to build it under another Apple account.
 
 **On the phone.** With a free account, iOS refuses to open the app until you trust the developer: Settings →
 General → VPN & Device Management → your Apple ID → Trust. Then open Alo, pick your languages, and choose **My own API
