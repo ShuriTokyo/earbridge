@@ -1,6 +1,8 @@
 // The microphone: 16 kHz mono 16-bit sound for the speech recognizer, in 100 ms chunks.
 // Android records with the app's own module, which can use Bluetooth earphones'
-// microphones and keeps listening while the phone is locked; iPhone uses the audio
+// microphones and keeps listening while the phone is locked. iPhone records with the app's
+// own module too (EarbridgeCapture), after choosing the microphone in the audio session; it
+// keeps only some voices and tells directions as Android does. Without it, the audio
 // library's recorder.
 
 import { PermissionsAndroid, Platform } from 'react-native';
@@ -17,6 +19,7 @@ import type {
   IsolationEvent,
   SeparationEvent,
 } from '../../modules/earbridge-audio/src/EarbridgeAudioModule.ts';
+import EarbridgeCapture from '../../modules/earbridge-audio/src/EarbridgeCaptureModule.ts';
 import { fromBase64 } from '../base64.ts';
 import { startIosSession, stopIosSession } from './ios-session.ts';
 
@@ -85,7 +88,7 @@ export interface Microphone {
   /**
    * Keeps only voices like these in the sound sent (onAudio), taking out everyone else and
    * most of the noise; every voice again with undefined. The sound then comes 0.5 to 2 s
-   * late, in bursts. False where the phone can't (iPhone).
+   * late, in bursts. False where the phone can't.
    */
   isolate(voices: KeptVoices | undefined): boolean;
   /**
@@ -104,43 +107,54 @@ const NOT_ALLOWED_IOS = 'Alo isn’t allowed to use the microphone. Allow it in 
 
 /**
  * Whether this phone may tell which way voices come from, by recording two of its
- * microphones. Android only; whether a phone really has two shows once it records.
+ * microphones; whether a phone really has two shows once it records.
  */
 export function canHearDirections(): boolean {
-  return EarbridgeAudio !== null;
+  return EarbridgeAudio !== null || (EarbridgeCapture?.canRecordStereo() ?? false);
 }
 
 export async function openMicrophone(options: MicrophoneOptions): Promise<Microphone> {
   if (EarbridgeAudio) {
     const status = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO);
     if (status !== PermissionsAndroid.RESULTS.GRANTED) throw new MicrophoneError(NOT_ALLOWED_ANDROID, true);
-    const mic = new AndroidMicrophone(EarbridgeAudio, options);
+    const mic = new NativeMicrophone(EarbridgeAudio, options, false);
     await mic.start();
     return mic;
   }
   if (Platform.OS === 'ios') {
     if ((await AudioManager.requestRecordingPermissions()) !== 'Granted') throw new MicrophoneError(NOT_ALLOWED_IOS, true);
-    const mic = new IosMicrophone(options);
+    const mic = EarbridgeCapture ? new NativeMicrophone(EarbridgeCapture, options, true) : new IosMicrophone(options);
     await mic.start();
     return mic;
   }
   throw new MicrophoneError('This device is not supported.');
 }
 
-/** The phone's module applies the mode as it hears, and keeps only some voices if asked. */
-class AndroidMicrophone implements Microphone {
+/** What both phones' modules do to record: Android's EarbridgeAudio, iPhone's EarbridgeCapture. */
+type CaptureModule = Pick<
+  NonNullable<typeof EarbridgeCapture>,
+  'addListener' | 'startCapture' | 'stopCapture' | 'setMicMode' | 'keepVoices' | 'keepAllVoices'
+>;
+
+/**
+ * The phone's module applies the mode as it hears, and keeps only some voices if asked. On
+ * iPhone (`ios`), the audio session chooses the microphone before the module records.
+ */
+class NativeMicrophone implements Microphone {
   input: CaptureInput = { input: 'phone', name: 'Microphone' };
-  private readonly module: NonNullable<typeof EarbridgeAudio>;
+  private readonly module: CaptureModule;
   private readonly options: MicrophoneOptions;
+  private readonly ios: boolean;
   private readonly subscriptions: { remove(): void }[];
   private stopped = false;
   private current: MicMode = 'off';
   private kept: KeptVoices | undefined;
   private earphoneMic: boolean;
 
-  constructor(module: NonNullable<typeof EarbridgeAudio>, options: MicrophoneOptions) {
+  constructor(module: CaptureModule, options: MicrophoneOptions, ios: boolean) {
     this.module = module;
     this.options = options;
+    this.ios = ios;
     this.earphoneMic = options.earphoneMic;
     this.subscriptions = [
       module.addListener('onAudio', (event) => {
@@ -224,18 +238,27 @@ class AndroidMicrophone implements Microphone {
     return this.input;
   }
 
-  private capture(): Promise<CaptureInput> {
-    return this.module.startCapture({
+  private async capture(): Promise<CaptureInput> {
+    if (this.ios) {
+      const input = await startIosSession(this.earphoneMic);
+      // Directions only from the phone's own microphones.
+      await this.module.startCapture({ directions: (this.options.directions ?? false) && input.input === 'phone' });
+      return input;
+    }
+    // Android's module takes these too (EarbridgeAudioModule.ts).
+    const android: Parameters<CaptureModule['startCapture']>[0] & { earphoneMic: boolean; testInputPath?: string } = {
       earphoneMic: this.earphoneMic,
       directions: this.options.directions ?? false,
       testInputPath: TEST_AUDIO,
-    });
+    };
+    return this.module.startCapture(android);
   }
 
   stop(): void {
     if (this.stopped) return;
     this.release();
-    this.module.stopCapture().catch(() => {});
+    const stopped = this.module.stopCapture().catch(() => {});
+    if (this.ios) void stopped.then(() => stopIosSession());
   }
 
   private release(): void {

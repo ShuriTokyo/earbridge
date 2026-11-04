@@ -228,12 +228,12 @@ Notes from building on a Mac:
 
 ### iPhone
 
-The app is set up for iPhone too, but it hasn't been built or tested on one yet. [docs/iphone.md](docs/iphone.md)
+The app builds for iPhone too, and has been run on one. [docs/iphone.md](docs/iphone.md)
 explains the two ways to build it: on a Mac with Xcode, installed over a cable with a free Apple ID (the app then runs
-for 7 days at a time), or in the cloud with EAS Build and a paid Apple Developer account. It also lists what is
-missing on iPhone: **On this phone**, and everything under **Voices** (telling the two voices from everyone else's,
-*Separate voices*, leaving out what someone said over a held line), which lives in an Android-only module for now.
-Choose **My own API keys** or **EarBridge server**, and **Hold to talk** in noisy places.
+for 7 days at a time), or in the cloud with EAS Build and a paid Apple Developer account. It also lists what works
+on iPhone: **On this phone** from iOS 26, and everything under **Voices** (telling the two voices from everyone else's,
+*Separate voices*, leaving out what someone said over a held line) and **Ignore voices from the sides**, in Swift
+modules of their own.
 
 ## Deploying
 

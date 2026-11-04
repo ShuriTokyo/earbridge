@@ -47,7 +47,7 @@ export const NAME_LENGTH = 40;
 /** Like the API keys: kept out of backups and off other phones. */
 const SECURE_OPTIONS: SecureStore.SecureStoreOptions = { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY };
 
-/** Whether this phone can tell voices apart: Android, with the app's own module. */
+/** Whether this phone can tell voices apart: with the app’s own module (Android and iPhone). */
 export function canCheckVoices(): boolean {
   return EarbridgeVoice !== null;
 }

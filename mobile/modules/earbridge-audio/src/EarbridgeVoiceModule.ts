@@ -23,5 +23,5 @@ declare class EarbridgeVoiceModule extends NativeModule<EarbridgeVoiceEvents> {
   unloadModel(): void;
 }
 
-// Android only; null on iOS.
+// Android, and iPhone (sherpa-onnx, the same speaker model): null elsewhere.
 export default requireOptionalNativeModule<EarbridgeVoiceModule>('EarbridgeVoice');

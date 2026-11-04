@@ -12,7 +12,9 @@
   },
   "apple": {
     "modules": [
-      "EarbridgeOnDeviceModule"
+      "EarbridgeOnDeviceModule",
+      "EarbridgeVoiceModule",
+      "EarbridgeCaptureModule"
     ]
   }
 }

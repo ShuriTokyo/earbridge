@@ -1,7 +1,7 @@
 # Building Alo for iPhone
 
-The phone app in [`mobile/`](../mobile) is set up for iPhone, but it has not been built or tested on one yet. This
-is what it takes, and what to expect. Nothing here needs any secret in the repository: your Apple account, signing
+The phone app in [`mobile/`](../mobile) builds for iPhone, and has been built and run on an iPhone 16 Plus (iOS 27)
+with a free Apple ID. This is what it takes, and what to expect. Nothing here needs any secret in the repository: your Apple account, signing
 certificates and API keys stay on your Mac, on Apple's servers, or on the phone.
 
 ## What works on iPhone, and what doesn't yet
@@ -12,11 +12,13 @@ certificates and API keys stay on your Mac, on Apple's servers, or on the phone.
 | **On this phone** (offline engines) | Android 13 or newer | **iOS 26 or newer**, written but untested: Apple's SpeechAnalyzer and Translation framework, in `mobile/modules/earbridge-audio/ios`. The iPhone asks once to allow speech recognition, and again before it downloads a language. Older iPhones show why it is unavailable. |
 | Earphones, their microphone and play/pause button | Yes | Set up (`react-native-audio-api`), untested |
 | Translating with the screen off | Yes, with a notification | Set up (the `audio` background mode), untested |
-| **Voices**: telling the two voices from everyone else's, *Separate voices*, and leaving out what someone else said over a held line | Yes | **No.** The speaker model (CAM++) and the separator run in a Kotlin module, `mobile/modules/earbridge-audio`, which has no Swift side yet. The app hides these settings when the module is missing (`canCheckVoices()` in `mobile/src/engines/voices.ts`). |
+| **Voices**: telling the two voices from everyone else's, *Separate voices*, and leaving out what someone else said over a held line | Yes | **Yes**, with **My own API keys**: the same speaker model (CAM++, sherpa-onnx 1.13.8) and separator (Conv-TasNet, on ONNX Runtime) in Swift: `EarbridgeVoiceModule.swift`, `VoiceIsolator.swift` and `EarbridgeCaptureModule.swift` in `mobile/modules/earbridge-audio/ios`. Not with **On this phone**, whose recognizer gives no word timings here. |
+| **Ignore voices from the sides** (two microphones) | Phones that record two microphones | **Yes**: the built-in microphone's stereo pattern, its axis along the phone's length (`EarbridgeCaptureModule.swift`, `DualMic.swift`). An iPhone that turns out to give one microphone twice is remembered, and the setting is turned off on it until iOS updates. |
 | Talk reports (`EXPO_PUBLIC_TALK_REPORT=1`) | Read over USB with `adb pull` | Written to the app's documents folder, but the app does not share it with Finder yet |
 
-Porting the voice checks means writing the other two modules of `expo-module.config.json` in Swift with sherpa-onnx's
-iOS framework and ONNX Runtime for the separator. Until then, iPhone users should use **Hold to talk** in noisy places.
+`pod install` fetches sherpa-onnx's iOS framework (`mobile/modules/earbridge-audio/ios/get-sherpa-onnx.sh`, checked by
+its SHA-256) and copies the separator model from the Android assets; both are git-ignored. ONNX Runtime comes from
+CocoaPods (`onnxruntime-objc`).
 
 ## Path 1: build it on a Mac, install it over a cable
 
@@ -46,6 +48,12 @@ npx expo run:ios --device --configuration Release
 ```
 
 `expo run:ios --device` lists the connected iPhones; pick yours. The first build takes a while.
+
+**Two things that break the build.** Keep the project in a folder whose path has no spaces (not under
+`~/Library/Application Support`, say): Expo's build scripts split such paths and fail with "No such file or
+directory". And if the last step, *Bundle React Native code and images*, fails with `EPERM` writing `main.jsbundle`,
+turn off Xcode's script sandbox for the app: in `mobile/ios/Alo.xcodeproj`, the **Alo** target → **Build Settings**
+→ **User Script Sandboxing** → **No** (`prebuild --clean` turns it back on).
 
 **Signing.** The first time, Xcode has to know which team signs the app:
 
