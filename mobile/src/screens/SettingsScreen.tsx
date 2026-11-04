@@ -158,7 +158,7 @@ export function SettingsScreen({ settings, onChange, onDone, onKeys, onVoices, c
               <View style={styles.why}>
                 <Icon name="info" size={22} color={palette.idle} />
                 <Text style={styles.whyText}>
-                  On this phone, they need Android 14 or newer. Press and hold to talk works best in noisy places.
+                  On this phone, they need Android 14 or iOS 26 or newer. Press and hold to talk works best in noisy places.
                 </Text>
               </View>
             </>

@@ -105,17 +105,45 @@ final class OnDeviceRecognition: @unchecked Sendable {
       throw OnDeviceError("Speech recognition on this iPhone doesn't support \"\(language)\".")
     }
     // Keeps the language on the phone for this app; it may fail when the app keeps too many.
-    _ = try? await AssetInventory.reserve(locale: locale)
+    let reserved = (try? await AssetInventory.reserve(locale: locale)) ?? false
+    let kept = await AssetInventory.reservedLocales.map { $0.identifier(.bcp47) }
+    NSLog("[EarBridgeOnDevice] download %@: reserved %@ (%d of %d kept: %@)", locale.identifier(.bcp47),
+          reserved ? "yes" : "no", kept.count, AssetInventory.maximumReservedLocales, kept.joined(separator: ", "))
     let transcriber = Self.transcriber(locale)
     guard let request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) else {
+      NSLog("[EarBridgeOnDevice] download %@: already installed", locale.identifier(.bcp47))
       return "done"
     }
+    // Progress is read every second, not only when iOS reports a change: a download iOS has
+    // not started yet then shows as 0%, and the log says it is waiting.
     let emit = self.emit
-    let observation = request.progress.observe(\.fractionCompleted) { progress, _ in
-      emit("onDownloadProgress", ["language": language, "percent": Int(progress.fractionCompleted * 100)])
+    let progress = request.progress
+    emit("onDownloadProgress", ["language": language, "percent": 0])
+    let watcher = Task {
+      var last = -1
+      var seconds = 0
+      while !Task.isCancelled {
+        let percent = Int(progress.fractionCompleted * 100)
+        if percent != last {
+          last = percent
+          emit("onDownloadProgress", ["language": language, "percent": percent])
+        }
+        if seconds % 10 == 0 {
+          NSLog("[EarBridgeOnDevice] download %@: %d%% after %d s (%lld of %lld units)", locale.identifier(.bcp47),
+                percent, seconds, progress.completedUnitCount, progress.totalUnitCount)
+        }
+        seconds += 1
+        try? await Task.sleep(nanoseconds: 1_000_000_000)
+      }
     }
-    defer { observation.invalidate() }
-    try await request.downloadAndInstall()
+    defer { watcher.cancel() }
+    do {
+      try await request.downloadAndInstall()
+    } catch {
+      NSLog("[EarBridgeOnDevice] download %@ failed: %@", locale.identifier(.bcp47), error.localizedDescription)
+      throw error
+    }
+    NSLog("[EarBridgeOnDevice] download %@: done", locale.identifier(.bcp47))
     return "done"
   }
 

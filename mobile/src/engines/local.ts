@@ -63,10 +63,11 @@ function iosVersion(): number {
 
 /**
  * Whether the phone's recognizer can say when words were said, which the noisy-place
- * filters need: Android 14 and newer. (Apple's says too, but the filters' voice checks
- * have no iPhone side yet.)
+ * filters need: Android 14 and newer, and Apple's SpeechAnalyzer (iOS 26 and newer, each
+ * result's audio time range; see OnDeviceRecognition.swift).
  */
 export function localWordTimings(): boolean {
+  if (Platform.OS === 'ios') return iosVersion() >= 26;
   return Platform.OS === 'android' && typeof Platform.Version === 'number' && Platform.Version >= 34;
 }
 

@@ -108,7 +108,7 @@ export function saveAppSettings(settings: AppSettings): void {
 
 /**
  * Whether the noisy-place filters can work: they judge speech by its sound, so the speech
- * recognition must say when each word was said. The phone's own does from Android 14.
+ * recognition must say when each word was said. The phone’s own does from Android 14 and iOS 26.
  */
 export function filtersWork(engine: Engine): boolean {
   return engine !== 'local' || localWordTimings();
